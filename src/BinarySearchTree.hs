@@ -2,6 +2,7 @@ module BinarySearchTree where
 
 import Control.Monad.Except
 import Test.QuickCheck
+import System.Random
 
 data Tree a = Empty | Node a (Tree a) (Tree a)
     deriving (Show)
@@ -47,8 +48,34 @@ deleteRoot (Node a lt rt) = let maxLt = treeMax lt
         treeMax (Node a _ Empty) = a
         treeMax (Node a _ rt) = treeMax rt
 
--- [TODO] - generate arbitrary BST
+-- Utilities 
 
-instance (Ord a, Num a, Arbitrary a) => Arbitrary (Tree a) where
-    arbitrary = undefined 
+size :: Tree a -> Int
+size Empty = 0
+size (Node _ lt rt) = 1 + size lt + size rt
 
+-- Arbitary instances
+
+-- [TODO] - add some description of this arbitrary instance
+instance (Ord a, Num a, Random a, Bounded a, Arbitrary a) => Arbitrary (Tree a) where
+    arbitrary = genTree 100 5
+        where
+            genTree _ 0 = return Empty
+            genTree v x = do
+                l <- choose (minBound, v)
+                r <- choose (v, maxBound)
+                lt <- genTree l (x-1)
+                rt <- genTree r (x-1)
+                frequency [(8, return $ Node v lt rt), (2, return Empty)]
+
+-- [TODO] - generate arbitrary BST for non-bounded data types
+
+-- Properties
+
+prop_insdel :: Ord a => a -> Tree a -> Bool
+prop_insdel a t = any bstinv [t, t', t'']
+    where
+        t'' = delete a t
+        t' = insert a t
+ 
+-- [TODO] - Can any of the operations be parallelized? Why or why not?
