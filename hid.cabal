@@ -18,8 +18,14 @@ cabal-version:       >=1.10
 
 library
   -- exposed-modules:     
-  -- other-modules:       
+  other-modules: BinarySearchTree, PingPong
   -- other-extensions:    
   build-depends:       base >=4.9 && <4.10
+    , distributed-process
+    , binary
+    , mtl == 2.*
+    , random == 1.*
+    , QuickCheck == 2.*
+
   hs-source-dirs:      src
   default-language:    Haskell2010
