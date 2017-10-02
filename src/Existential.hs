@@ -2,6 +2,9 @@
 {-# LANGUAGE RankNTypes #-}
 module Existential where
 
+import System.Random
+import Control.Monad.State
+
 -- An existential data type, for any given A, there exists a T
 data T = forall a. MkT a
 -- i.e, MkT :: forall a. (a -> T)
@@ -109,19 +112,20 @@ apply f x = f x
 -- How about: http://lucacardelli.name/Papers/OnUnderstanding.A4.pdf
 -- But can we reason about this?
 
--- (forall a) in Haskell is simply {a : Set} in Agda ? In this case, the proofs above can be written as propositional proofs..
+-- (forall a) in Haskell is simply {a : Set} in Agda ? YES, INDEED.
 
-
--- UNDERSTANDING PARAMETRIC POLYMORPHISM WHEN USING RANK-N TYPES
-
+-------------------------------------------------------------------
+-- UNDERSTANDING PARAMETRIC POLYMORPHISM WHEN USING RANK-N TYPES -- 
+-------------------------------------------------------------------
 
 -- This polymorphic function works. Does it say something about how Haskell's polymorpshim works in general?
 atoInt :: forall a. a -> Int
 atoInt _ = 42
+-- On application of atoInt, a is demanded from the expression being applied
 
--- This also a polymorphic function, but on b
-f2 :: b -> (forall a. a -> b) -> b
-f2 b f = f b
+-- This also a polymorphic function, but ONLY on b
+notFullyPolyF :: b -> (forall a. a -> b) -> b
+notFullyPolyF b f = f b
 
 -- This function isn't polymorphic AT ALL!
 -- the type of notPolyF is monomorphic (i.e, a concrete type)
@@ -134,6 +138,58 @@ notPolyF f = f 3
 i2i :: Int -> Int
 i2i x = x
 
--- This does not type check!
+-- This (below term) does not type check!
 -- wrong = notPolyF i2i
--- this is because notPolyF expects a polymorphic function as an argument
+-- this is because notPolyF expects a polymorphic function as an argument, and i2i is not!
+
+------------------------
+-- USING RANK-N TYPES --
+------------------------
+
+-- Ref: https://ocharles.org.uk/blog/guest-posts/2014-12-18-rank-n-types.html
+
+data Player = Player {
+      playerName :: String,
+      playerPos  :: (Double, Double)
+    } deriving (Eq, Ord, Show)
+
+-- a type which helps us constrain a monadic type to contain a Random value
+-- Random is clearly a type class
+type GenAction m = forall a. (Random a) => m a
+
+-- a function type which returns a monad containing a random value when given a range of random values
+type GenActionR m = forall a. (Random a) => (a, a) -> m a
+
+
+-- get a random value in the state monad which carries around the generator as state
+genRandom :: (RandomGen g) => GenAction (State g)
+-- effectively, genRandom :: (RandomGen g, Random a) => State g a
+genRandom = state random
+
+-- get a random value within a range in the state monad which carries around the generator as state
+genRandomR :: (RandomGen g) => GenActionR (State g)
+-- effectively, genRandomR :: (RandomGen g, Random a) => (a,a) -> State g a
+genRandomR range = state (randomR range)
+
+-- a function which returns a random player in ANY MONAD (which obeys the contraints)
+randomPlayer :: (Monad m) => GenActionR m -> m Player
+-- interestingly, this type does not have any random-related constraints
+-- the constraints are applied (during evluataion) from GenActionR
+randomPlayer genR = do
+    len <- genR (1, 10)
+    name <- replicateM len (genR ('a','z'))
+    x <- genR (-100,100)
+    y <- genR (-100,100)
+    return $ Player name (x,y)
+
+-- the argument of type GenActionR, alows us to accept a polymorphic function (over the value a, not the monad itself), just like:
+-- randomRIO :: Random a => (a, a) -> IO a
+-- i.e., randomRIO :: GenActionR IO
+
+main :: IO ()
+main = randomPlayer randomRIO >>= print
+
+-- Super cool! Here, we use randomPlayer in the IO monad - just like that ;)
+-- Why does this work?
+-- GHC infers m = IO, since main :: IO(), and expects `GenActionR IO` to randomPlayer - which we provide
+-- and the rest is history (just kidding, it's evil IO)
