@@ -109,4 +109,31 @@ apply f x = f x
 -- How about: http://lucacardelli.name/Papers/OnUnderstanding.A4.pdf
 -- But can we reason about this?
 
--- (forall a) in Haskell is simply {a : Set} in Agda ? In this case, the proofs above can be written as porpositional proofs..
+-- (forall a) in Haskell is simply {a : Set} in Agda ? In this case, the proofs above can be written as propositional proofs..
+
+
+-- UNDERSTANDING PARAMETRIC POLYMORPHISM WHEN USING RANK-N TYPES
+
+
+-- This polymorphic function works. Does it say something about how Haskell's polymorpshim works in general?
+atoInt :: forall a. a -> Int
+atoInt _ = 42
+
+-- This also a polymorphic function, but on b
+f2 :: b -> (forall a. a -> b) -> b
+f2 b f = f b
+
+-- This function isn't polymorphic AT ALL!
+-- the type of notPolyF is monomorphic (i.e, a concrete type)
+notPolyF ::  (forall a. a -> a) -> Int
+notPolyF f = f 3
+-- The idea is that when we do `notPolyF id` the evaluation demands an argument, 
+-- which is a value (or function if you like) of type (forall a. a -> a)
+-- for this reason,
+
+i2i :: Int -> Int
+i2i x = x
+
+-- This does not type check!
+-- wrong = notPolyF i2i
+-- this is because notPolyF expects a polymorphic function as an argument
