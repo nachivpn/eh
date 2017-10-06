@@ -193,3 +193,79 @@ main = randomPlayer randomRIO >>= print
 -- Why does this work?
 -- GHC infers m = IO, since main :: IO(), and expects `GenActionR IO` to randomPlayer - which we provide
 -- and the rest is history (just kidding, it's evil IO)
+
+
+data List a = 
+    Cons a (List a)
+    | Nil
+    deriving Show
+
+-- pattern matching combinator
+uncons :: (a -> List a -> r) -> r -> List a -> r
+uncons _ r Nil = r
+uncons f _ (Cons x xs) = f x xs
+
+-- returns True only if list is null
+listNull :: List a -> Bool
+listNull = uncons (\_ _ -> False) True
+
+-- map
+listMap :: (a -> b) -> List a -> List b
+listMap f = uncons (\a as -> Cons (f a) (listMap f as)) Nil
+
+-- scott encoding of lists
+-- Shallow embedding of lists!
+newtype ListS a =
+    ListS {
+      unconsS :: forall r. (a -> ListS a -> r) -> r -> r
+    }
+-- psssst! ListS :: (forall r. (a -> ListS a -> r) -> r -> r) -> ListsS a
+
+nilS :: ListS a
+nilS = ListS (\_ nil -> nil)
+
+consS :: a -> ListS a -> ListS a
+consS a as = ListS (\cons _ -> cons a as)
+
+unconsS' :: (a -> ListS a -> r) -> r -> ListS a -> r
+unconsS' f nil (ListS listFun) = listFun f nil
+
+instance Functor ListS where
+    fmap f = unconsS' (\a as -> consS (f a) (fmap f as)) nilS
+
+
+-- Church encoding of lists
+-- Shallow embedding!
+newtype ListC a = ListC {
+    foldC :: forall r. (a -> r -> r) -> r -> r
+}
+-- ListC :: (forall r. (a -> r -> r) -> r -> r) -> ListC a
+-- Explanation of this type: We try want to create a function, 
+-- to which when you supply the folding (aggregating function) 
+-- and the base case, we get the result of fold, i.e, we want to create the FOLD!
+
+-- in other words, fold is simply:
+foldC' :: (a -> r -> r) -> r -> ListC a -> r
+foldC' f r (ListC fold) = fold f r
+
+-- simply return the base case (nothing else to do here)
+nilC :: ListC a
+nilC = ListC (\_ b -> b)
+
+-- I don't think I can ever explain this
+-- Ok, maybe I can: Apply the fold function to this new element and the "aggregate"
+-- which is obtained by folding over the given list
+consC :: a -> ListC a -> ListC a
+consC a list = ListC (\f b -> f a (foldC' f b list))
+
+-- or this works too (same thing, by defn of fold):
+-- consC a (ListC listFun) = ListC (\f b -> f a (listFun f b))
+
+-- this approach ensures that the result lists folds over a list with the new element
+
+instance Functor ListC where
+     fmap f = foldC' (\a as -> consC (f a) as) nilC
+
+-- TODO (maybe later)
+unconsC :: (a -> ListC a -> r) -> r -> ListC a -> r
+unconsC = undefined
