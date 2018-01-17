@@ -62,3 +62,40 @@ prop_is_safety = disjointIntervals . interval_scheduling
 
 prop_ip_safety :: [Interval Int] -> Bool
 prop_ip_safety = and . map disjointIntervals . interval_partitioning
+
+-- weighted interval
+type WInterval a = (Interval a, Int)
+
+wisort :: Ord a => (Interval a -> a) -> [WInterval a] -> [WInterval a] 
+wisort f []              = []
+wisort f (wi@(i,_):xs)    = wisort f left ++ wi : wisort f right
+    where
+        left = [ x | x@(xi,xw) <- xs,  xi `isLtf` i]
+        right = [ x | x@(xi,xw) <- xs, not $ xi `isLtf` i]
+        isLtf = isLt f
+
+-- exhaustive search solution to maximizing weighted interval scheduling
+weighted_scheduling_ex :: Ord a =>
+    [WInterval a]       -- | list of itervals
+    -> Int              -- | optimal total weight of pairwise disjoint intervals
+weighted_scheduling_ex = opt . reverse . wisort snd
+        where
+            opt :: Ord a => [WInterval a] -> Int
+            opt []              = 0
+            opt [(_,w)]         = w
+            opt (x@(_,w):xs)    = max (opt xs) (opt (removeOverlap x xs) + w)
+            -- remove overlapping intervals
+            removeOverlap x = dropWhile (isOverlapRW x)
+            -- compute if intervals overlap considering reverse order
+            isOverlapRW (x,_) (y,_) = flip isOverlap x y
+
+-- Dynamic programming solution to maximizing weighted interval scheduling
+weighted_scheduling_dp :: Ord a =>
+    [WInterval a]       -- | list of itervals
+    -> Int              -- | optimal total weight of pairwise disjoint intervals
+weighted_scheduling_dp = undefined -- Use state monad to store pre-computed opt values
+
+weighted_scheduling :: Ord a =>
+    [WInterval a]       -- | list of itervals
+    -> [WInterval a]    -- | intervals that are pairwise disjoint & have max total weight
+weighted_scheduling = undefined
