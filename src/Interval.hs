@@ -106,15 +106,15 @@ weighted_scheduling_dp xs = evalState (opt (reverse $ wisort snd $ xs)) Map.empt
                             Nothing  -> do
                                 a <- opt xs
                                 b <- opt (removeOverlap x xs)
-                                return $ max a (b + w)
+                                let v = max a (b + w)
+                                map <- Map.insert x v <$> get 
+                                put map
+                                return v 
                     -- remove overlapping intervals
                     removeOverlap x = dropWhile (isOverlapRW x)
                     -- compute if intervals overlap considering reverse order
                     isOverlapRW (x,_) (y,_) = flip isOverlap x y
 
--- takes forever to complete, why?
--- either the size of tests need to be reduced
--- or this says something about the style of dynamic programming used
 prop_ex_equals_dp :: [WInterval Int] -> Bool
 prop_ex_equals_dp xs = weighted_scheduling_ex xs == weighted_scheduling_dp xs
 
