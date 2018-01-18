@@ -1,5 +1,8 @@
 module Interval where
 
+import Control.Monad.State
+import qualified Data.Map.Strict as Map
+
 type Interval a = (a,a)
 
 -- O (1)
@@ -82,7 +85,6 @@ weighted_scheduling_ex = opt . reverse . wisort snd
         where
             opt :: Ord a => [WInterval a] -> Int
             opt []              = 0
-            opt [(_,w)]         = w
             opt (x@(_,w):xs)    = max (opt xs) (opt (removeOverlap x xs) + w)
             -- remove overlapping intervals
             removeOverlap x = dropWhile (isOverlapRW x)
@@ -93,7 +95,28 @@ weighted_scheduling_ex = opt . reverse . wisort snd
 weighted_scheduling_dp :: Ord a =>
     [WInterval a]       -- | list of itervals
     -> Int              -- | optimal total weight of pairwise disjoint intervals
-weighted_scheduling_dp = undefined -- Use state monad to store pre-computed opt values
+weighted_scheduling_dp xs = evalState (opt (reverse $ wisort snd $ xs)) Map.empty 
+                where
+                    opt :: Ord a => [WInterval a] -> State (Map.Map (WInterval a) Int) Int
+                    opt []  = return 0
+                    opt (x@(_,w):xs) = do
+                        value <- Map.lookup x <$> get
+                        case value of
+                            Just x -> return x
+                            Nothing  -> do
+                                a <- opt xs
+                                b <- opt (removeOverlap x xs)
+                                return $ max a (b + w)
+                    -- remove overlapping intervals
+                    removeOverlap x = dropWhile (isOverlapRW x)
+                    -- compute if intervals overlap considering reverse order
+                    isOverlapRW (x,_) (y,_) = flip isOverlap x y
+
+-- takes forever to complete, why?
+-- either the size of tests need to be reduced
+-- or this says something about the style of dynamic programming used
+prop_ex_equals_dp :: [WInterval Int] -> Bool
+prop_ex_equals_dp xs = weighted_scheduling_ex xs == weighted_scheduling_dp xs
 
 weighted_scheduling :: Ord a =>
     [WInterval a]       -- | list of itervals
