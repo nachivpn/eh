@@ -2,6 +2,7 @@ module Interval where
 
 import Control.Monad.State
 import qualified Data.Map.Strict as Map
+import Test.QuickCheck
 
 type Interval a = (a,a)
 
@@ -30,7 +31,7 @@ isort f (i@(a,b):xs)    = isort f left ++ i : isort f right
 interval_scheduling :: Ord a => 
     [Interval a]        -- | list of itervals
     -> [Interval a]     -- | list of intervals that are pairwise disjoint in sorted order
-interval_scheduling = reverse . is [] . isort snd
+interval_scheduling = is [] . isort snd
     where
         -- O (n ^ 2)
         is ss []     = ss
@@ -60,15 +61,65 @@ disjointIntervals (x:xs) = (isDisjoint x xs) && (disjointIntervals xs)
     where
         isDisjoint x xs = and $ map (not . isOverlap x) xs
 
-prop_is_safety :: [Interval Int] -> Bool
-prop_is_safety = disjointIntervals . interval_scheduling
+prop_is_safety :: [Interval Int] -> Property
+prop_is_safety xs = valid_intervals ==> 
+    disjointIntervals . isort snd . interval_scheduling $ xs
+    where
+        valid_intervals = and [ a <= b | (a,b) <- xs]
 
 prop_ip_safety :: [Interval Int] -> Bool
 prop_ip_safety = and . map disjointIntervals . interval_partitioning
 
--- weighted interval
+----------------------------------
+-- Weighted interval Scheduling --
+----------------------------------
+
 type WInterval a = (Interval a, Int)
 
+type WIResult a = (Int, [WInterval a]) 
+type WIState a = Map.Map (WInterval a) (WIResult a)
+
+weighted_scheduling :: Ord a =>
+    [WInterval a]              -- | list of itervals
+    -> WIResult a    -- | intervals that are pairwise disjoint & have max total weight
+weighted_scheduling xs = evalState (opt . reverse . wisort snd $ xs) Map.empty
+        where
+            opt :: Ord a => [WInterval a] -> State (WIState a) (WIResult a)
+            opt []  = return (0,[])
+            opt (x@(_,w):xs) = do
+                value <- Map.lookup x <$> get
+                case value of
+                    Just rv -> return rv
+                    Nothing  -> do
+                        (a, aws) <- opt xs
+                        (b, bws) <- opt (removeOverlap x xs)
+                        let b' = (b + w)
+                        if a > b' then do
+                            -- if x is NOT in the solution
+                            let rv = (a, aws)
+                            map' <- Map.insert x rv <$> get
+                            put map'
+                            return rv
+                        else do
+                            -- if x IS in the solution
+                            let rv = (b', x:bws)
+                            map' <- Map.insert x rv <$> get
+                            put map'
+                            return rv
+
+-- exhaustive search to maximize total wieght of weighted interval scheduling
+weighted_scheduling_ex_opt :: Ord a =>
+    [WInterval a]       -- | list of itervals
+    -> Int              -- | optimal total weight of pairwise disjoint intervals
+weighted_scheduling_ex_opt = opt . reverse . wisort snd
+        where
+            opt :: Ord a => [WInterval a] -> Int
+            opt []              = 0
+            opt (x@(_,w):xs)    = max (opt xs) (opt (removeOverlap x xs) + w)
+               
+-- | Utilities
+
+-- | Sort a list of wieghted intervals
 wisort :: Ord a => (Interval a -> a) -> [WInterval a] -> [WInterval a] 
 wisort f []              = []
 wisort f (wi@(i,_):xs)    = wisort f left ++ wi : wisort f right
@@ -77,48 +128,28 @@ wisort f (wi@(i,_):xs)    = wisort f left ++ wi : wisort f right
         right = [ x | x@(xi,xw) <- xs, not $ xi `isLtf` i]
         isLtf = isLt f
 
--- exhaustive search solution to maximizing weighted interval scheduling
-weighted_scheduling_ex :: Ord a =>
-    [WInterval a]       -- | list of itervals
-    -> Int              -- | optimal total weight of pairwise disjoint intervals
-weighted_scheduling_ex = opt . reverse . wisort snd
-        where
-            opt :: Ord a => [WInterval a] -> Int
-            opt []              = 0
-            opt (x@(_,w):xs)    = max (opt xs) (opt (removeOverlap x xs) + w)
-            -- remove overlapping intervals
-            removeOverlap x = dropWhile (isOverlapRW x)
-            -- compute if intervals overlap considering reverse order
-            isOverlapRW (x,_) (y,_) = flip isOverlap x y
+-- remove overlapping intervals
+removeOverlap x = dropWhile (isOverlapRW x)
 
--- Dynamic programming solution to maximizing weighted interval scheduling
-weighted_scheduling_dp :: Ord a =>
-    [WInterval a]       -- | list of itervals
-    -> Int              -- | optimal total weight of pairwise disjoint intervals
-weighted_scheduling_dp xs = evalState (opt (reverse $ wisort snd $ xs)) Map.empty 
-                where
-                    opt :: Ord a => [WInterval a] -> State (Map.Map (WInterval a) Int) Int
-                    opt []  = return 0
-                    opt (x@(_,w):xs) = do
-                        value <- Map.lookup x <$> get
-                        case value of
-                            Just x -> return x
-                            Nothing  -> do
-                                a <- opt xs
-                                b <- opt (removeOverlap x xs)
-                                let v = max a (b + w)
-                                map <- Map.insert x v <$> get 
-                                put map
-                                return v 
-                    -- remove overlapping intervals
-                    removeOverlap x = dropWhile (isOverlapRW x)
-                    -- compute if intervals overlap considering reverse order
-                    isOverlapRW (x,_) (y,_) = flip isOverlap x y
+-- compute if intervals overlap considering reverse order
+isOverlapRW (x,_) (y,_) = flip isOverlap x y
 
-prop_ex_equals_dp :: [WInterval Int] -> Bool
-prop_ex_equals_dp xs = weighted_scheduling_ex xs == weighted_scheduling_dp xs
 
-weighted_scheduling :: Ord a =>
-    [WInterval a]       -- | list of itervals
-    -> [WInterval a]    -- | intervals that are pairwise disjoint & have max total weight
-weighted_scheduling = undefined
+-- tests for weighted interval scheduling
+
+prop_sound_wis :: [WInterval Int] -> Bool
+prop_sound_wis xs = let (w, wis) = weighted_scheduling xs in
+    w == foldr (\(_,w) acc -> acc + w) 0 wis
+
+prop_wisw_equals_ex_opt :: [WInterval Int] -> Bool
+prop_wisw_equals_ex_opt xs = let (w, wis) = weighted_scheduling xs in
+    w == weighted_scheduling_ex_opt xs
+
+disjointWIntervals :: Ord a => [WInterval a] -> Bool
+disjointWIntervals = disjointIntervals . isort snd . map fst
+
+prop_wis_safety :: [WInterval Int] -> Property
+prop_wis_safety xs = valid_intervals ==> 
+    let (w, wis) = weighted_scheduling xs in disjointWIntervals wis
+    where
+        valid_intervals = and [ a <= b | ((a,b),_) <- xs]
