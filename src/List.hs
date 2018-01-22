@@ -36,3 +36,10 @@ subseq_sum seq t = evalState (opt t (zip [1..] seq) t) Map.empty
                     rv <- liftM2 (||) (opt t xs (n-x)) (opt t xs t)
                     Map.insert (i,n) rv <$> get >>= put
                     return rv
+
+-- ctci 8.4
+-- Powerset of a given set 
+power_set :: [a] -> [[a]]
+power_set [] = [[]]
+power_set (x:xs) = let pxs = power_set xs 
+    in [ x : p | p <- pxs] ++ pxs

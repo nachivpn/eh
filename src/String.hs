@@ -75,3 +75,6 @@ stringCompression original@(x:xs)
     stringCompression' c n (x:xs) 
         | c /= x = (c : show n) ++ stringCompression' x 1 xs
         | otherwise = stringCompression' c (n+1) xs
+
+isPalindrome :: String -> Bool
+isPalindrome str = reverse str == str
