@@ -2,8 +2,12 @@ module List where
 
 import qualified Data.Map.Strict as Map
 import Control.Monad.State
+import Data.Ord (Ordering(..))
+import Data.List (minimumBy, maximumBy)
 
 -- Subset sum
+-- O(n * T) time & space
+-- where n is the number of elements and T is the target
 subset_sum :: (Ord a , Num a) => [a] -> a -> Bool
 subset_sum xs n = evalState (opt (zip [1..] xs) n) Map.empty
     where
@@ -21,6 +25,8 @@ subset_sum xs n = evalState (opt (zip [1..] xs) n) Map.empty
                     return rv
 
 -- Subsequence sum
+-- O(n * T) time & space
+-- where n is the number of elements and T is the target
 subseq_sum :: (Eq a, Ord a , Num a) => [a] -> a -> Bool
 subseq_sum seq t = evalState (opt t (zip [1..] seq) t) Map.empty
     where
@@ -38,8 +44,18 @@ subseq_sum seq t = evalState (opt t (zip [1..] seq) t) Map.empty
                     return rv
 
 -- ctci 8.4
+-- O (n * 2^n) time & space
 -- Powerset of a given set 
 power_set :: [a] -> [[a]]
 power_set [] = [[]]
 power_set (x:xs) = let pxs = power_set xs 
     in [ x : p | p <- pxs] ++ pxs
+
+-- length of shortest subsequence with a given target
+shortestsubseq_sum :: (Eq a, Ord a , Num a) => [a] -> a -> Int
+shortestsubseq_sum seq target = opt seq target
+    where
+        -- length of the shortest subsequence with given target
+        opt _       0       = 0
+        opt []      t       = maxBound      -- pseudo infinity
+        opt (x:xs)  t       = min (opt xs target) (opt xs (t-x) + 1)
