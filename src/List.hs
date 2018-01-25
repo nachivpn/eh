@@ -59,3 +59,25 @@ shortestsubseq_sum seq target = opt seq target
         opt _       0       = 0
         opt []      t       = maxBound      -- pseudo infinity
         opt (x:xs)  t       = min (opt xs target) (opt xs (t-x) + 1)
+
+-- given a list of numbers, find the k'th smallest element
+-- i.e., given the rank, find the element
+-- O(n) time & space
+select :: (Ord a, Num a) => [a] -> Int -> Maybe a
+select mxs = sel mxs
+    where
+        sel [] k        = Nothing
+        sel xs@(x:_) k
+            | r > k     = sel [ y | y <- xs,y < x] k 
+            | r < k     = sel [ y | y <- xs, y > x] k
+            | otherwise = Just x
+            where
+                r = rank mxs x
+
+-- given a list of numbers, find the rank of an element
+-- O (n) time & O(1) space
+rank :: Ord a => [a] -> a -> Int
+rank [] k = 1
+rank (x:xs) k 
+    | x < k     = 1 + rank xs k
+    | otherwise = rank xs k
