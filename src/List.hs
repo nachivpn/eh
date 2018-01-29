@@ -81,3 +81,52 @@ rank [] k = 1
 rank (x:xs) k 
     | x < k     = 1 + rank xs k
     | otherwise = rank xs k
+
+-- ctci 2.4
+partitition :: Ord a => [a] -> a -> [a]
+partitition xs m = lp ++ rp
+    where
+        (lp,rp) = p xs
+        p [] = ([],[])
+        p (x:xs)
+            | x < m = (x : lp, rp)
+            | otherwise = (lp, x : rp)
+            where
+                (lp,rp) = p xs
+
+-- ctci 2.5 (part A)
+sum_lists :: [Int] -> [Int] -> [Int]
+sum_lists xs ys = sl xs ys 0
+    where
+        sl [] [] c 
+            | c > 0 = [c]
+            | otherwise = []
+        -- sl [] (x:xs)
+        sl (x:xs) (y:ys) c = x' : sl xs ys c'
+            where
+                sxy = x + y + c
+                x' = sxy `mod` 10
+                c' = sxy `div` 10
+
+-- ctci 2.5 (part B)
+sum_lists' :: [Int] -> [Int] -> [Int]
+sum_lists' xs ys = if c > 0 then c : result else result
+    where
+        (c, result) = sl pad_xs pad_ys
+        (pad_xs, pad_ys) = if len_diff > 0 
+            then (xs, replicate (abs len_diff) 0 ++ ys)
+            else (replicate (abs len_diff) 0 ++ xs, ys)
+        xs_len = length xs
+        ys_len = length ys
+        len_diff = xs_len - ys_len
+        sl :: [Int] -> [Int] -> (Int,[Int])
+        sl [] []         = (0,[])
+        sl [] ys         = (0,ys)
+        sl xs []         = (0,xs)
+        sl (x:xs) (y:ys) = (c' , x' : slt)
+            where
+                (c, slt) = sl xs ys
+                sxy = x + y + c
+                x' = sxy `mod` 10
+                c' = sxy `div` 10
+
