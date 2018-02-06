@@ -8,17 +8,15 @@ data Tree a = Empty | Node a (Tree a) (Tree a)
     deriving (Show)
 
 -- | BST Invariant
-bstinv :: Ord a => Tree a -> Bool
-bstinv Empty = True
-bstinv (Node a Empty Empty) = True
-bstinv (Node a (Node l llt lrt) Empty) =
-    a >= l && bstinv llt && bstinv lrt
-bstinv (Node a Empty (Node r rlt rrt)) = 
-    a < r && bstinv rlt &&  bstinv rrt
-bstinv (Node a (Node l llt lrt) (Node r rlt rrt)) = 
-    a >= l && a < r && 
-    bstinv llt && bstinv lrt && 
-    bstinv rlt &&  bstinv rrt
+bstinv :: (Bounded a, Ord a) => Tree a -> Bool
+bstinv tr =
+    bi tr (minBound, maxBound)
+    where
+        bi :: Ord a => Tree a -> (a, a) -> Bool
+        bi Empty _                      = True
+        bi (Node a lt rt) (minb,maxb)   =
+            a >= minb && a < maxb &&
+            bi lt (minb,a) && bi rt (a,maxb)
 
 -- | Insert a node
 insert :: (Ord a) => a -> Tree a -> Tree a
@@ -54,6 +52,16 @@ size :: Tree a -> Int
 size Empty = 0
 size (Node _ lt rt) = 1 + size lt + size rt
 
+height :: Tree a -> Int
+height Empty = 0
+height (Node _ lt rt) = 1 + max (height lt) (height rt)
+
+isBalanced :: Tree a -> Bool
+isBalanced Empty = True
+isBalanced (Node _ lt rt) = 
+    abs (height lt - height rt) <= 1 
+    && isBalanced lt && isBalanced rt
+
 -- Arbitary instances
 
 -- [TODO] - add some description of this arbitrary instance
@@ -72,10 +80,12 @@ instance (Ord a, Num a, Random a, Bounded a, Arbitrary a) => Arbitrary (Tree a) 
 
 -- Properties
 
-prop_insdel :: Ord a => a -> Tree a -> Bool
+prop_insdel :: (Bounded a, Ord a) => a -> Tree a -> Bool
 prop_insdel a t = any bstinv [t, t', t'']
     where
         t'' = delete a t
         t' = insert a t
- 
+
+prop_bstinv :: (Bounded a, Ord a) => Tree a -> Bool
+prop_bstinv = bstinv
 -- [TODO] - Can any of the operations be parallelized? Why or why not?
