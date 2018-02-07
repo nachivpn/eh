@@ -8,6 +8,15 @@ import Data.List (sort , nub)
 data Tree a = Empty | Node a (Tree a) (Tree a)
     deriving (Show)
 
+sampleTree = 
+    Node 20
+        (Node 8 
+            (Node 4 Empty Empty) 
+            (Node 12 
+                (Node 10 Empty Empty) 
+                (Node 14 Empty Empty))) 
+        (Node 22 Empty Empty)
+
 -- | BST Invariant
 bstinv :: (Bounded a, Ord a) => Tree a -> Bool
 bstinv tr =
@@ -109,3 +118,23 @@ prop_min_bst :: [Int] -> Bool
 prop_min_bst as = all ($ mbst) [bstinv, isBalanced]
     where
         mbst = min_bst (sort . nub $ as)
+
+-- suc of an element v in a BST is evidently 
+-- the left most element on the right sub-tree of v
+-- OR - in the case - where v has NO right sub-tree
+-- it is the first value greater than v while "tracing back upward"
+suc :: Ord a => a -> Tree a -> Maybe a
+suc v Empty  = Nothing
+suc v (Node a lt rt) 
+    | v < a     = 
+        case suc v lt of
+            Nothing -> Just a   -- Nothing signals that v has no right sub-tree
+            result  -> result
+    | v > a     = suc v rt
+    | v == a    = leftMost rt
+    where
+        leftMost :: Tree a -> Maybe a
+        leftMost Empty              = Nothing
+        leftMost (Node a Empty _)   = Just a
+        leftMost (Node a lt _)      = leftMost lt
+        
