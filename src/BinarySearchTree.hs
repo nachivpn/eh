@@ -3,6 +3,7 @@ module BinarySearchTree where
 import Control.Monad.Except
 import Test.QuickCheck
 import System.Random
+import Data.List (sort , nub)
 
 data Tree a = Empty | Node a (Tree a) (Tree a)
     deriving (Show)
@@ -15,7 +16,7 @@ bstinv tr =
         bi :: Ord a => Tree a -> (a, a) -> Bool
         bi Empty _                      = True
         bi (Node a lt rt) (minb,maxb)   =
-            a >= minb && a < maxb &&
+            a > minb && a <= maxb &&
             bi lt (minb,a) && bi rt (a,maxb)
 
 -- | Insert a node
@@ -89,3 +90,22 @@ prop_insdel a t = any bstinv [t, t', t'']
 prop_bstinv :: (Bounded a, Ord a) => Tree a -> Bool
 prop_bstinv = bstinv
 -- [TODO] - Can any of the operations be parallelized? Why or why not?
+
+-- |Input list must be sorted and nub'd for 
+-- constructing a bst of minimum height
+min_bst :: Ord a => [a] -> Tree a
+min_bst [] = Empty
+min_bst as = case splt as of
+    Nothing -> Empty
+    Just (ls,a,rs) -> Node a (min_bst ls) (min_bst rs)
+    where
+        splt :: [a] -> Maybe ([a],a,[a])
+        splt [] = Nothing
+        splt as = let mid = length as `div` 2
+                      (lh,rh) = splitAt mid as
+                    in Just (lh, head rh, tail rh)
+
+prop_min_bst :: [Int] -> Bool
+prop_min_bst as = all ($ mbst) [bstinv, isBalanced]
+    where
+        mbst = min_bst (sort . nub $ as)
